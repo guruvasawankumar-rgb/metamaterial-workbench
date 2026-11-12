@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metamaterial FE Workbench</title>
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="grow">
+    <h1><span>Metamaterial <span class="acc">Workbench</span></span><span class="verchip" title="Version">v1.1</span></h1>
+    <p>Bloch finite-element analysis of locally resonant lattices: band structure, complete gaps, complex band, sensitivity and edge waves.</p>
+  </div>
+  <div class="status" id="status" role="status">Ready</div>
+  <button class="btn" type="button" id="themeBtn" title="Colours: follow the system, light or dark">Theme: auto</button>
+  <div class="runbox"><button class="run" id="run">Run analysis</button><button class="stop" id="stop" type="button" disabled>Stop</button></div>
+</header>
+<div class="bar"><i id="prog"></i></div>
+<div class="shell">
+<aside class="rail" aria-label="Model parameters">
+  <details class="grp" open><summary><span class="num">1</span>Geometry</summary>
+  <fieldset>
+    <legend>Unit cell</legend>
+    <select class="full" id="design" aria-label="Unit cell design">
+      <optgroup label="Ready-made cells (all editable)">
+        <option value="hexcant" selected>A · Hexagon, cantilever with tip mass</option>
+        <option value="hexspokes">B · Hexagon, centre mass on six spokes, inner ring, six blocks</option>
+        <option value="hexbeam">C · Hexagon, beam across, centre mass</option>
+      </optgroup>
+      <optgroup label="Build your own">
+        <option value="own">Lattice + resonator of your choice</option>
+      </optgroup>
+      <optgroup label="Advanced">
+        <option value="custom">Custom beam cell (nodes and beams, JSON)</option>
+      </optgroup>
+    </select>
+    <p class="note" id="designNote"></p>
+    <select class="hidden" id="lat" aria-hidden="true" tabindex="-1">
+      <option value="hexagon" selected>hexagon</option><option value="square">square</option><option value="triangular">triangular</option><option value="kagome">kagome</option><option value="custom">custom</option><option value="drawn">drawn</option>
+    </select>
+    <div id="aBox"><div class="row"><label for="a">Lattice constant a</label><div class="inp"><input id="a" type="number" step="any" value="50"><span>mm</span></div></div></div>
+    <div id="hexBox">
+      <div class="row"><label for="hl">Inclined wall length l</label><div class="inp"><input id="hl" type="number" step="any" value="8.083"><span>mm</span></div></div>
+      <div class="row"><label for="hv">Vertical wall length h</label><div class="inp"><input id="hv" type="number" step="any" value="8.083"><span>mm</span></div></div>
+      <div class="row"><label for="hth">Cell angle θ</label><div class="inp"><input id="hth" type="number" step="any" value="30"><span>deg</span></div></div>
+      <p class="note">θ = 30° with h = l is the regular hexagon. Negative θ gives a re-entrant (auxetic) cell.</p>
+      <div class="row"><label for="hLC">Regular hexagon from lattice constant</label><div class="inp"><input id="hLC" type="number" step="any" value="14"><span>mm</span></div></div>
+      <button class="mini" id="setLC" type="button">Set regular hexagon from this lattice constant</button>
+    </div>
+    <div id="customBox" class="hidden">
+      <textarea id="json" spellcheck="false" aria-label="Custom cell definition" rows="16"></textarea>
+      <p class="note" id="jsonNote">Lengths in mm, masses in g, J in g·mm². “shift” is the cell offset [n₁, n₂] of node j. Role “res” marks resonator parts.</p>
+    </div>
+    <button class="mini" id="toCustom" type="button">Copy this design into the custom editor</button>
+    <div id="drawnBox" class="hidden"><p class="note">The cell is edited in the <b>Unit cell</b> tab: standard shapes (any regular polygon, rectangle, circle) used as plates, beam frames, shell walls or holes, plus free beams, walls, plates, masses, mass-springs and templates. Sizes, thicknesses, positions and materials of every part are typed there or changed with the mouse. All analyses work on it: dispersion, sensitivity and edge waves.</p><button class="mini" type="button" id="openEditor">Open the cell editor</button></div>
+    <button class="mini" id="editAsDraw" type="button">Edit this cell freely (convert to an editable cell)</button>
+    <p class="note" id="latNote"></p>
+  </fieldset>
+  <div id="genBox" class="hidden">
+  <fieldset>
+    <legend>Lattice</legend>
+    <div class="row" id="gLatRow"><label for="gLat">Lattice</label><div class="inp"><select id="gLat"><option value="hex" selected>Hexagon (honeycomb)</option><option value="square">Square</option><option value="tri">Triangle</option><option value="kagome">Kagome</option><option value="free">Free (draw the frame yourself)</option></select></div></div>
+    <div data-glat="hex square tri kagome">
+      <div class="row"><label for="gL" id="gLlab">Hexagon side L</label><div class="inp"><input id="gL" type="number" step="any" value="10"><span>mm</span></div></div>
+      <div class="row"><label for="gW">Wall width w (in plane)</label><div class="inp"><input id="gW" type="number" step="any" value="1"><span>mm</span></div></div>
+      <div class="row"><label for="gH">Wall height h (out of plane)</label><div class="inp"><input id="gH" type="number" step="any" value="3"><span>mm</span></div></div>
+    </div>
+    <p class="note" data-glat="free">Draw the frame in the Unit cell tab (Shape → Frame of beams, or Beam). The lattice vectors a₁, a₂ are set there.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Resonator</legend>
+    <div class="row" id="gResRow"><label for="gRes">Resonator</label><div class="inp"><select id="gRes"><option value="none">None (bare lattice)</option><option value="cant">Cantilever with tip mass</option><option value="spokes">Centre mass on spokes</option><option value="across" selected>Beam across, centre mass</option><option value="membrane">Membrane with centre mass</option><option value="spring">Mass on spring</option></select></div></div>
+    <div data-gres="cant">
+      <div class="row"><label for="gCw">Walls (numbers or “all”)</label><div class="inp"><input id="gCw" type="text" value="1"></div></div>
+      <div class="row"><label for="gCt">Position along wall (0–1)</label><div class="inp"><input id="gCt" type="number" step="any" value="0.5"></div></div>
+      <div class="row"><label for="gCL">Arm length from wall face</label><div class="inp"><input id="gCL" type="number" step="any" value="4"><span>mm</span></div></div>
+      <div class="row"><label for="gCb">Arm width</label><div class="inp"><input id="gCb" type="number" step="any" value="1"><span>mm</span></div></div>
+      <div class="row"><label for="gCh">Arm thickness</label><div class="inp"><input id="gCh" type="number" step="any" value="0.6"><span>mm</span></div></div>
+      <div class="row"><label for="gBl">Tip block length</label><div class="inp"><input id="gBl" type="number" step="any" value="2.5"><span>mm</span></div></div>
+      <div class="row"><label for="gBw">Tip block width</label><div class="inp"><input id="gBw" type="number" step="any" value="2.5"><span>mm</span></div></div>
+      <div class="row"><label for="gBh">Tip block height</label><div class="inp"><input id="gBh" type="number" step="any" value="2"><span>mm</span></div></div>
+    </div>
+    <div data-gres="spokes across membrane">
+      <div class="row"><label for="gMs">Centre mass shape</label><div class="inp"><select id="gMs"><option value="poly" selected>Polygon (like the cell)</option><option value="circle">Circle</option></select></div></div>
+      <div class="row"><label for="gMR">Centre mass radius R</label><div class="inp"><input id="gMR" type="number" step="any" value="2.5"><span>mm</span></div></div>
+      <div class="row"><label for="gMt">Centre mass thickness t</label><div class="inp"><input id="gMt" type="number" step="any" value="2"><span>mm</span></div></div>
+      <div class="row"><label for="gMrho">Mass density (blank = material)</label><div class="inp"><input id="gMrho" type="number" step="any" placeholder="same"><span>kg/m³</span></div></div>
+    </div>
+    <div data-gres="spokes across">
+      <div class="row"><label for="gSb">Beam width</label><div class="inp"><input id="gSb" type="number" step="any" value="0.6"><span>mm</span></div></div>
+      <div class="row"><label for="gSh">Beam thickness</label><div class="inp"><input id="gSh" type="number" step="any" value="0.6"><span>mm</span></div></div>
+    </div>
+    <div data-gres="across">
+      <div class="row"><label for="gAx">Beam runs between</label><div class="inp"><select id="gAx"><option value="mid" selected>Two opposite sides (mid-points)</option><option value="corner">Two opposite corners</option></select></div></div>
+    </div>
+    <div data-gres="spokes">
+      <div class="row"><label for="gRr">Inner ring radius (0 = none)</label><div class="inp"><input id="gRr" type="number" step="any" value="6"><span>mm</span></div></div>
+      <div class="row"><label for="gRw">Ring width</label><div class="inp"><input id="gRw" type="number" step="any" value="0.6"><span>mm</span></div></div>
+      <div class="row"><label for="gKs">Block size (0 = none)</label><div class="inp"><input id="gKs" type="number" step="any" value="0.9"><span>mm</span></div></div>
+      <div class="row"><label for="gKt">Block thickness</label><div class="inp"><input id="gKt" type="number" step="any" value="1.5"><span>mm</span></div></div>
+      <p class="note">Blocks sit where the ring meets the spokes (half-way along the spokes when there is no ring).</p>
+    </div>
+    <div data-gres="membrane">
+      <div class="row"><label for="gMm">Membrane thickness</label><div class="inp"><input id="gMm" type="number" step="any" value="0.1"><span>mm</span></div></div>
+      <p class="note">The membrane uses the Membrane material (section 2).</p>
+    </div>
+    <div data-gres="spring">
+      <div class="row"><label for="gPm">Mass</label><div class="inp"><input id="gPm" type="number" step="any" value="0.5"><span>g</span></div></div>
+      <div class="row"><label for="gPf">Frequency (out of plane)</label><div class="inp"><input id="gPf" type="number" step="any" value="1500"><span>Hz</span></div></div>
+      <div class="row"><label for="gPw">On walls (numbers or “all”)</label><div class="inp"><input id="gPw" type="text" value="1"></div></div>
+    </div>
+    <div data-gres="cant spokes across membrane">
+      <div class="row"><label for="gZr">Masses and blocks: thickness</label><div class="inp"><select id="gZr"><option value="mid" selected>Centred on the mid-plane</option><option value="bottom">Upward from the mid-plane</option></select></div></div>
+    </div>
+  </fieldset>
+  <p class="note err hidden" id="gErr"></p>
+  <p class="note hidden" id="gEdited">You have edited this cell in the Unit cell tab, so these numbers no longer drive it. Press the button to rebuild the cell from them (your hand edits are replaced; Undo brings them back).</p>
+  <button class="mini" type="button" id="gRebuild">Rebuild the cell from these numbers</button>
+  </div>
+  <fieldset id="hostSet">
+    <legend>Wall cross-section</legend>
+    <select class="full" id="hshape" aria-label="Wall cross-section">
+      <option value="rect">Rectangular section</option>
+      <option value="circ">Circular rod</option>
+    </select>
+    <div class="row" id="hbRow"><label for="hb">In-plane width b</label><div class="inp"><input id="hb" type="number" step="any" value="1"><span>mm</span></div></div>
+    <div class="row"><label for="hh" id="hhLabel">Thickness h (out of plane)</label><div class="inp"><input id="hh" type="number" step="any" value="5"><span>mm</span></div></div>
+    <div class="row" id="vfRow"><label for="vf">Vertical wall width × </label><div class="inp"><input id="vf" type="number" step="any" value="1"></div></div>
+  </fieldset>
+  <fieldset id="resSet">
+    <legend>Resonator</legend>
+    <select class="full" id="rtype" aria-label="Resonator type">
+      <option value="none">None (bare lattice)</option>
+      <option value="arm" selected>Cantilever arm with tip mass</option>
+      <option value="spring">Mass on spring</option>
+      <option value="central">Central mass on ligaments</option>
+    </select>
+    <div id="attachBox">
+      <div class="row"><label for="ratt">Attached at</label><div class="inp"><select id="ratt"><option value="mid" selected>Wall mid-span</option><option value="t">Point along wall</option><option value="junction">Junctions</option></select></div></div>
+      <div class="row" id="tRow"><label for="rt">Position along wall (0–1)</label><div class="inp"><input id="rt" type="number" step="any" value="0.3"></div></div>
+      <div class="row" id="wallRow"><label for="rwalls">Walls (numbers or “all”)</label><div class="inp"><input id="rwalls" type="text" value="1"></div></div>
+    </div>
+    <div id="armBox">
+      <div class="row"><label for="rori">Arm direction</label><div class="inp"><select id="rori"><option value="in">Into the cell</option><option value="out">Out of the cell</option><option value="both">Both sides (pair)</option><option value="angle">Fixed angle</option></select></div></div>
+      <div class="row" id="angRow"><label for="rang">Angle from x</label><div class="inp"><input id="rang" type="number" step="any" value="0"><span>deg</span></div></div>
+      <div class="row"><label for="rshape">Arm shape</label><div class="inp"><select id="rshape"><option value="straight">Straight</option><option value="L">L-shaped</option></select></div></div>
+      <div class="row"><label for="rL" id="rLlab">Arm length from wall face</label><div class="inp"><input id="rL" type="number" step="any" value="6.5"><span>mm</span></div></div>
+      <div id="lBox" class="hidden">
+        <div class="row"><label for="rL2">Second leg length</label><div class="inp"><input id="rL2" type="number" step="any" value="6"><span>mm</span></div></div>
+        <div class="row"><label for="rturn">Turn angle</label><div class="inp"><input id="rturn" type="number" step="any" value="90"><span>deg</span></div></div>
+      </div>
+      <div class="row"><label for="rb">Arm width</label><div class="inp"><input id="rb" type="number" step="any" value="2"><span>mm</span></div></div>
+      <div class="row"><label for="rh">Arm thickness</label><div class="inp"><input id="rh" type="number" step="any" value="1"><span>mm</span></div></div>
+      <div class="row"><label for="tipf">Tip mass form</label><div class="inp"><select id="tipf"><option value="block" selected>Rectangular block</option><option value="point">Point mass</option></select></div></div>
+      <div id="blockBox">
+        <div class="row"><label for="bL">Block length (along arm)</label><div class="inp"><input id="bL" type="number" step="any" value="6"><span>mm</span></div></div>
+        <div class="row"><label for="bW">Block width</label><div class="inp"><input id="bW" type="number" step="any" value="6"><span>mm</span></div></div>
+        <div class="row"><label for="bH">Block height (out of plane)</label><div class="inp"><input id="bH" type="number" step="any" value="5"><span>mm</span></div></div>
+        <div class="row"><label for="bRho">Block density (blank = material)</label><div class="inp"><input id="bRho" type="number" step="any" placeholder="same"><span>kg/m³</span></div></div>
+        <div class="row"><label for="bPos">Block position</label><div class="inp"><select id="bPos"><option value="centred" selected>Centred on arm tip</option><option value="beyond">Starts at arm tip</option></select></div></div>
+      </div>
+      <div id="pointBox" class="hidden">
+        <div class="row"><label for="rmt">Tip mass (cube)</label><div class="inp"><input id="rmt" type="number" step="any" value="0.8"><span>g</span></div></div>
+        <div class="row"><label for="rside">Cube side</label><div class="inp"><input id="rside" type="number" step="any" value="5"><span>mm</span></div></div>
+      </div>
+    </div>
+    <div id="springBox" class="hidden">
+      <div class="row"><label for="rm">Resonator mass m</label><div class="inp"><input id="rm" type="number" step="any" value="2"><span>g</span></div></div>
+      <div class="row"><label for="rk">Spring stiffness k</label><div class="inp"><input id="rk" type="number" step="any" value="28400"><span>N/m</span></div></div>
+      <div class="row"><label for="ftarget">Tune k to f<sub>r</sub></label><div class="inp"><input id="ftarget" type="number" step="any" value="600"><span>Hz</span></div></div>
+      <button class="mini" id="tune" type="button">Set k from this frequency</button>
+    </div>
+    <div id="centralBox" class="hidden">
+      <div class="row"><label for="cM">Central mass</label><div class="inp"><input id="cM" type="number" step="any" value="3"><span>g</span></div></div>
+      <div class="row"><label for="cS">Cube side</label><div class="inp"><input id="cS" type="number" step="any" value="7"><span>mm</span></div></div>
+      <div class="row"><label for="cTo">Ligaments to</label><div class="inp"><select id="cTo"><option value="corners">Cell corners</option><option value="mids">Wall mid-spans</option></select></div></div>
+      <div class="row"><label for="cb">Ligament width</label><div class="inp"><input id="cb" type="number" step="any" value="1.5"><span>mm</span></div></div>
+      <div class="row"><label for="ch">Ligament thickness</label><div class="inp"><input id="ch" type="number" step="any" value="1"><span>mm</span></div></div>
+    </div>
+    <p class="note" id="resNote"></p>
+  </fieldset>
+  </details>
+  <details class="grp" open><summary><span class="num">2</span>Material</summary>
+  <fieldset>
+    <legend>Host (lattice walls and frame)</legend>
+    <select class="full" id="matp" aria-label="Material preset">
+      <option value="al">Aluminium 6061-T6</option>
+      <option value="ti">Titanium Ti-6Al-4V</option>
+      <option value="ss">Stainless steel 304</option>
+      <option value="cf">CFRP, quasi-isotropic (approx.)</option>
+      <option value="pa">PA12 nylon (SLS)</option>
+      <option value="pla">PLA (FDM)</option>
+      <option value="resin">Photopolymer resin (SLA, approx.)</option>
+      <option value="esp">Electrospun nanofibre mat (approx.)</option>
+      <option value="custom">Custom</option>
+    </select>
+    <div class="row"><label for="E">Young’s modulus E</label><div class="inp"><input id="E" type="number" step="any" value="68.9"><span>GPa</span></div></div>
+    <div class="row"><label for="nu">Poisson’s ratio ν</label><div class="inp"><input id="nu" type="number" step="any" value="0.33"></div></div>
+    <div class="row"><label for="rho">Density ρ</label><div class="inp"><input id="rho" type="number" step="any" value="2700"><span>kg/m³</span></div></div>
+  </fieldset>
+  <fieldset>
+    <legend>Resonator</legend>
+    <select class="full" id="rmatp" aria-label="Resonator material preset">
+      <option value="same" selected>Same as host</option>
+      <option value="al">Aluminium 6061-T6</option>
+      <option value="ti">Titanium Ti-6Al-4V</option>
+      <option value="ss">Stainless steel 304</option>
+      <option value="cf">CFRP, quasi-isotropic (approx.)</option>
+      <option value="pa">PA12 nylon (SLS)</option>
+      <option value="pla">PLA (FDM)</option>
+      <option value="resin">Photopolymer resin (SLA, approx.)</option>
+      <option value="esp">Electrospun nanofibre mat (approx.)</option>
+      <option value="custom">Custom</option>
+    </select>
+    <div id="rmatBox" class="hidden">
+      <div class="row"><label for="rE">Young’s modulus E</label><div class="inp"><input id="rE" type="number" step="any" value="68.9"><span>GPa</span></div></div>
+      <div class="row"><label for="rnu">Poisson’s ratio ν</label><div class="inp"><input id="rnu" type="number" step="any" value="0.33"></div></div>
+      <div class="row"><label for="rrho">Density ρ</label><div class="inp"><input id="rrho" type="number" step="any" value="2700"><span>kg/m³</span></div></div>
+    </div>
+    <p class="note">Applies to every resonator part: arms, tip blocks, ligaments and central masses, and drawn parts marked “resonator”. A value typed on a single drawn part, or a block density under Geometry, overrides it. The stub inside the wall stays host material.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Membrane</legend>
+    <select class="full" id="mmatp" aria-label="Membrane material preset">
+      <option value="same" selected>Same as resonator</option>
+      <option value="al">Aluminium 6061-T6</option>
+      <option value="ti">Titanium Ti-6Al-4V</option>
+      <option value="ss">Stainless steel 304</option>
+      <option value="cf">CFRP, quasi-isotropic (approx.)</option>
+      <option value="pa">PA12 nylon (SLS)</option>
+      <option value="pla">PLA (FDM)</option>
+      <option value="resin">Photopolymer resin (SLA, approx.)</option>
+      <option value="esp">Electrospun nanofibre mat (approx.)</option>
+      <option value="custom">Custom</option>
+    </select>
+    <div id="mmatBox" class="hidden">
+      <div class="row"><label for="mE">Young’s modulus E</label><div class="inp"><input id="mE" type="number" step="any" value="0.05"><span>GPa</span></div></div>
+      <div class="row"><label for="mnu">Poisson’s ratio ν</label><div class="inp"><input id="mnu" type="number" step="any" value="0.3"></div></div>
+      <div class="row"><label for="mrho">Density ρ</label><div class="inp"><input id="mrho" type="number" step="any" value="400"><span>kg/m³</span></div></div>
+    </div>
+    <p class="note">Used by drawn plates set to the material “Membrane”, such as the membrane of template (c). Its thickness is set on the plate (or in the template). A thin membrane is modelled as a shell without prestress.</p>
+  </fieldset>
+  </details>
+  <details class="grp" open><summary><span class="num">3</span>Solver</summary>
+  <fieldset>
+    <legend>Discretisation</legend>
+    <div class="row"><label for="beam">Beam theory</label><div class="inp"><select id="beam"><option value="tim" selected>Timoshenko</option><option value="eb">Euler–Bernoulli</option></select></div></div>
+    <div class="row"><label for="ne">Elements per wall</label><div class="inp"><select id="ne"><option>2</option><option selected>4</option><option>6</option><option>8</option></select></div></div>
+    <p class="note">Drawn cells use the element size set in the cell editor.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Wave vectors and bands</legend>
+    <div class="row"><label for="path">Zone path</label><div class="inp"><select id="path"><option value="std" selected>Standard Γ–X–K–Γ / Γ–X–M–Γ if the cell allows it</option><option value="stdforce">Γ–X–K–Γ / Γ–X–M–Γ, forced (ignores symmetry)</option><option value="auto">Automatic from cell symmetry</option><option value="quarter">Quarter zone</option><option value="half">Half zone (any cell)</option><option value="custom">Custom path (your own points)</option></select></div></div>
+    <div id="kpathBox" class="hidden">
+      <div class="row"><label for="kpU">Point coordinates</label><div class="inp"><select id="kpU"><option value="frac">Fractions of b₁, b₂</option><option value="cart">kx, ky in units of π/a</option></select></div></div>
+      <textarea id="kpT" class="kpt" rows="5" spellcheck="false" aria-label="Custom zone path">Γ 0 0
+X 1/2 0
+K 2/3 1/3
+Γ 0 0</textarea>
+      <button class="mini" id="kpFill" type="button">Start from the automatic path</button>
+      <p class="note">One point per line: a label, then two numbers (fractions such as 2/3 are fine). The bands are computed along straight lines from point to point. With π/a units, a = |a₁|.</p>
+    </div>
+    <canvas id="cvKpath" class="kpath" aria-label="Brillouin zone and the zone path"></canvas>
+    <p class="note" id="kpNote"></p>
+    <div class="row"><label for="kper">k-points per path segment</label><div class="inp"><input id="kper" type="number" step="1" value="16"></div></div>
+    <div class="row"><label for="nb">Bands to compute</label><div class="inp"><input id="nb" type="number" step="1" value="10"></div></div>
+    <p class="note">The cell’s symmetry is checked automatically: when a resonator or a shape breaks the six- or four-fold symmetry, the standard path is replaced by the longer path that symmetry needs (half zone for an asymmetric cell).</p>
+  </fieldset>
+  <fieldset>
+    <legend>Frequency range</legend>
+    <div class="row"><label for="fmin">Min frequency</label><div class="inp"><input id="fmin" type="number" step="any" value="0"><span>Hz</span></div></div>
+    <div class="row"><label for="fmax">Max frequency (0 = auto)</label><div class="inp"><input id="fmax" type="number" step="any" value="0"><span>Hz</span></div></div>
+    <div class="row"><label for="nf">Complex-band frequencies</label><div class="inp"><input id="nf" type="number" step="1" value="300"></div></div>
+    <p class="note">The range sets the plot axes and where the complex band is sampled. If the max lies above the computed bands, more bands are added automatically (up to 60).</p>
+  </fieldset>
+  </details>
+</aside>
+
+<main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="t-geo" aria-selected="true" aria-controls="p-geo">Unit cell</button>
+    <button role="tab" id="t-disp" aria-selected="false" aria-controls="p-disp">Dispersion</button>
+    <button role="tab" id="t-sens" aria-selected="false" aria-controls="p-sens">Sensitivity</button>
+    <button role="tab" id="t-edge" aria-selected="false" aria-controls="p-edge">Edge waves</button>
+    <button role="tab" id="t-meth" aria-selected="false" aria-controls="p-meth">Method</button>
+  </nav>
+
+  <section class="panel" id="p-geo" role="tabpanel" aria-labelledby="t-geo">
+    <div class="convbar"><button class="run" type="button" id="editAsDraw2">Edit this cell freely</button><span>Turns every wall, arm and mass into parts you can move, resize, delete or add to with shapes, plates and shell walls. Sensitivity and edge waves work on the edited cell too.</span></div>
+    <h2>Unit cell and tiling</h2>
+    <p class="lede">Top view of a 3 × 3 patch. The dashed outline is the unit cell and the numbered tags are the wall numbers used for placing resonators. The inset shows the Brillouin zone and the path used for the bands. The drawing updates as you edit.</p>
+    <div class="geo">
+      <div class="frame"><canvas id="cvGeo" aria-label="Lattice geometry"></canvas></div>
+      <div class="frame side">
+        <h3>Cell properties</h3>
+        <table class="kv" id="kv"></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="p-drw" role="tabpanel" aria-labelledby="t-geo">
+    <h2>Unit cell editor</h2>
+    <p class="lede">Build the cell from shapes and parts in top view. The <b>Shape</b> tool places a regular polygon (any number of sides), rectangle or circle, used as a shell plate, a frame of beams, shell walls or a hole: type its centre, size and rotation, or drag it and its handles with the mouse. Or start from a template and edit it. Beams have a width and a height; shell walls are vertical strips with a thickness and a height; shell plates have a thickness and may have holes. Parts may cross the dashed cell outline: everything repeats periodically and points snap to the periodic copies. Mark each part as host or resonator. Run the analysis from the top bar; results appear in the Dispersion tab.</p>
+    <div class="dbar">
+      <div class="seg dtools" id="dTools" role="radiogroup" aria-label="Drawing tool"></div>
+      <div class="seg" role="radiogroup" aria-label="Role of new parts"><button type="button" role="radio" data-drole="host" aria-checked="true">New parts: host</button><button type="button" role="radio" data-drole="res" aria-checked="false">resonator</button></div><button class="mini" type="button" id="dAutoRole" title="Parts of the lattice frame become host, everything else resonator">Frame = host, rest = resonator</button>
+    </div>
+    <div class="dbar dbar2">
+      <button class="mini" type="button" id="dUndo">Undo</button><button class="mini" type="button" id="dRedo">Redo</button><button class="mini" type="button" id="dFit">Fit view</button>
+      <button class="mini" type="button" id="dClear">Clear drawing</button>
+      <button class="mini" type="button" id="dSave">Save drawing (.json)</button><label class="mini filebtn">Open drawing<input type="file" id="dLoad" accept=".json,application/json"></label>
+      <label class="chk inl"><input type="checkbox" id="dMeshShow" checked> show shell mesh</label>
+    </div>
+    <div class="dgrid">
+      <div class="latwarn hidden" id="dLatWarn" role="alert"><span></span><button class="mini" type="button" id="dLatWarnFit">Fit lattice to frame</button></div>
+      <div class="frame"><canvas id="cvDraw" aria-label="Unit-cell drawing area"></canvas></div>
+      <div class="dside">
+        <div class="hcard">
+          <h3>New part</h3>
+          <div data-dnew="shape" class="hidden">
+            <div class="row"><label for="dSty">Shape</label><div class="inp"><select id="dSty"><option value="ngon">Regular polygon</option><option value="rect">Rectangle</option><option value="circle">Circle</option></select></div></div>
+            <div data-dst="ngon"><div class="row"><label for="dSn">Number of sides</label><div class="inp"><input id="dSn" type="number" step="1" value="6"></div></div></div>
+            <div data-dst="ngon circle"><div class="row"><label for="dSm">Size given as</label><div class="inp"><select id="dSm"><option value="R" data-for="ngon circle">Corner radius / radius R</option><option value="s" data-for="ngon">Side length</option><option value="ri" data-for="ngon">Inner radius (to a side)</option><option value="d" data-for="circle">Diameter</option></select></div></div>
+              <div class="row"><label for="dSv">Size</label><div class="inp"><input id="dSv" type="number" step="any" value="3"><span>mm</span></div></div></div>
+            <div data-dst="rect"><div class="row"><label for="dSx">Width</label><div class="inp"><input id="dSx" type="number" step="any" value="6"><span>mm</span></div></div><div class="row"><label for="dSy">Height (in plane)</label><div class="inp"><input id="dSy" type="number" step="any" value="3"><span>mm</span></div></div></div>
+            <div class="row"><label for="dSa">Rotation</label><div class="inp"><input id="dSa" type="number" step="any" value="0"><span>deg</span></div></div>
+            <div class="row"><label for="dSu">Use as</label><div class="inp"><select id="dSu"><option value="plate">Shell plate (filled)</option><option value="frame">Frame of beams (edges)</option><option value="walls">Shell walls (edges)</option><option value="hole">Hole in a plate</option></select></div></div>
+            <div data-dsu="plate walls"><div class="row"><label for="dSt">Thickness t</label><div class="inp"><input id="dSt" type="number" step="any" value="1"><span>mm</span></div></div></div>
+            <div data-dsu="frame"><div class="row"><label for="dSb">Beam width b</label><div class="inp"><input id="dSb" type="number" step="any" value="0.6"><span>mm</span></div></div><div class="row"><label for="dSh">Beam height h</label><div class="inp"><input id="dSh" type="number" step="any" value="1"><span>mm</span></div></div></div>
+            <div data-dsu="walls"><div class="row"><label for="dSH">Wall height H</label><div class="inp"><input id="dSH" type="number" step="any" value="3"><span>mm</span></div></div><div class="row"><label for="dSz0">Bottom edge z₀</label><div class="inp"><input id="dSz0" type="number" step="any" value="-1.5"><span>mm</span></div></div></div>
+            <div data-dsu="plate frame"><div class="row"><label for="dSz">Height z</label><div class="inp"><input id="dSz" type="number" step="any" value="0"><span>mm</span></div></div></div>
+            <div data-dsu="plate frame"><div class="row"><label for="dSzr">Thickness measured</label><div class="inp"><select id="dSzr"><option value="">Centred on z</option><option value="bottom">Upward from z</option><option value="top">Downward from z</option></select></div></div></div>
+            <div data-dsu="plate"><label class="chk"><input type="checkbox" id="dSmem"> membrane material</label></div>
+            <div class="row"><label>Centre x, y</label><div class="inp2"><input id="dScx" type="number" step="any" value="0"><input id="dScy" type="number" step="any" value="0"><span>mm</span></div></div>
+            <button class="mini" type="button" id="dSadd">Add at this centre</button>
+            <p class="note">Or click in the drawing to place it there. New parts take the role chosen above (host or resonator). A hole cuts the plate under its centre.</p>
+          </div>
+          <div data-dnew="beam"><div class="row"><label for="dPb">Width b</label><div class="inp"><input id="dPb" type="number" step="any" value="1"><span>mm</span></div></div><div class="row"><label for="dPh">Height h</label><div class="inp"><input id="dPh" type="number" step="any" value="5"><span>mm</span></div></div><div class="row"><label for="dPz">Axis height z</label><div class="inp"><input id="dPz" type="number" step="any" value="0"><span>mm</span></div></div></div>
+          <div data-dnew="wall" class="hidden"><div class="row"><label for="dPt">Thickness t</label><div class="inp"><input id="dPt" type="number" step="any" value="1"><span>mm</span></div></div><div class="row"><label for="dPH">Height H</label><div class="inp"><input id="dPH" type="number" step="any" value="5"><span>mm</span></div></div><div class="row"><label for="dPz0">Bottom edge z₀</label><div class="inp"><input id="dPz0" type="number" step="any" value="-2.5"><span>mm</span></div></div></div>
+          <div data-dnew="plate hole" class="hidden"><div class="row"><label for="dPpt">Plate thickness t</label><div class="inp"><input id="dPpt" type="number" step="any" value="1"><span>mm</span></div></div><div class="row"><label for="dPpz">Plate height z</label><div class="inp"><input id="dPpz" type="number" step="any" value="0"><span>mm</span></div></div><p class="note">A hole is drawn inside an existing plate.</p></div>
+          <div data-dnew="mass" class="hidden"><div class="row"><label for="dPm">Mass</label><div class="inp"><input id="dPm" type="number" step="any" value="0.5"><span>g</span></div></div><div class="row"><label for="dPside">Cube side</label><div class="inp"><input id="dPside" type="number" step="any" value="4"><span>mm</span></div></div><div class="row"><label for="dPmz">Height z</label><div class="inp"><input id="dPmz" type="number" step="any" value="0"><span>mm</span></div></div></div>
+          <div data-dnew="spring" class="hidden"><div class="row"><label for="dPsm">Mass</label><div class="inp"><input id="dPsm" type="number" step="any" value="0.5"><span>g</span></div></div><div class="row"><label for="dPsf">Frequency (out of plane)</label><div class="inp"><input id="dPsf" type="number" step="any" value="800"><span>Hz</span></div></div><div class="row"><label for="dPsz">Height z</label><div class="inp"><input id="dPsz" type="number" step="any" value="0"><span>mm</span></div></div></div>
+          <div data-dnew="template" class="hidden">
+            <div class="row"><label for="dTt">Template</label><div class="inp"><select id="dTt"><option value="cant">Cantilever + block</option><option value="L">L-shaped arm + block</option><option value="spring">Mass on spring</option></select></div></div>
+            <div data-dtt="cant L"><div class="row"><label for="dTa">Direction (from x)</label><div class="inp"><input id="dTa" type="number" step="any" value="90"><span>deg</span></div></div>
+              <div class="row"><label for="dTs">Stub inside wall (host)</label><div class="inp"><input id="dTs" type="number" step="any" value="0"><span>mm</span></div></div>
+              <div class="row"><label for="dTL">Arm length</label><div class="inp"><input id="dTL" type="number" step="any" value="6.5"><span>mm</span></div></div>
+              <div class="row"><label for="dTb">Arm width</label><div class="inp"><input id="dTb" type="number" step="any" value="2"><span>mm</span></div></div>
+              <div class="row"><label for="dTh">Arm thickness</label><div class="inp"><input id="dTh" type="number" step="any" value="1"><span>mm</span></div></div>
+              <div data-dtt="L"><div class="row"><label for="dTL2">Second leg</label><div class="inp"><input id="dTL2" type="number" step="any" value="5"><span>mm</span></div></div><div class="row"><label for="dTturn">Turn</label><div class="inp"><input id="dTturn" type="number" step="any" value="90"><span>deg</span></div></div></div>
+              <div class="row"><label for="dTbL">Block length</label><div class="inp"><input id="dTbL" type="number" step="any" value="6"><span>mm</span></div></div>
+              <div class="row"><label for="dTbW">Block width</label><div class="inp"><input id="dTbW" type="number" step="any" value="6"><span>mm</span></div></div>
+              <div class="row"><label for="dTbH">Block height</label><div class="inp"><input id="dTbH" type="number" step="any" value="5"><span>mm</span></div></div>
+              <div class="row"><label for="dTsh">Stub height</label><div class="inp"><input id="dTsh" type="number" step="any" value="5"><span>mm</span></div></div></div>
+            <div data-dtt="spring"><div class="row"><label for="dTm">Mass</label><div class="inp"><input id="dTm" type="number" step="any" value="0.5"><span>g</span></div></div><div class="row"><label for="dTf">Frequency</label><div class="inp"><input id="dTf" type="number" step="any" value="800"><span>Hz</span></div></div></div>
+            <div class="row"><label for="dTz">Height z</label><div class="inp"><input id="dTz" type="number" step="any" value="0"><span>mm</span></div></div>
+          </div>
+          <div data-dnew="select" class="hidden"><p class="note">Choose a drawing tool above. With Select you can click, move and edit parts.</p></div>
+        </div>
+        <div class="hcard" id="dProps"></div>
+        <div class="hcard">
+          <h3>Lattice and mesh</h3>
+          <div class="row"><label>a₁ (x, y)</label><div class="inp2"><input id="dA1x" type="number" step="any"><input id="dA1y" type="number" step="any"><span>mm</span></div></div>
+          <div class="row"><label>a₂ (x, y)</label><div class="inp2"><input id="dA2x" type="number" step="any"><input id="dA2y" type="number" step="any"><span>mm</span></div></div>
+          <div class="row"><label for="dLatP">Preset</label><div class="inp"><select id="dLatP"><option value="hex">Hexagonal</option><option value="square">Square</option><option value="rect">Rectangular</option></select></div></div>
+          <div class="row"><label>a (and b for rectangle)</label><div class="inp2"><input id="dLatA" type="number" step="any" value="14"><input id="dLatB" type="number" step="any" value=""><span>mm</span></div></div>
+          <button class="mini" type="button" id="dLatSet">Apply preset</button>
+          <div class="latfit"><button class="mini" type="button" id="dLatFit" title="Sets a₁ and a₂ from the selected shape or plate (else the largest frame outline) so that copies of it meet side to side">Fit lattice to frame shape</button>
+          <label class="chkline"><input type="checkbox" id="dLatFollow"> Keep fitting when the frame changes</label></div>
+          <p class="note" id="dLatMsg">Draw the frame as a square, rectangle, parallelogram or hexagon, then press “Fit lattice to frame shape”: a₁ and a₂ are worked out from it.</p>
+          <div class="row"><label for="dGrid">Snap grid</label><div class="inp"><input id="dGrid" type="number" step="any" value="0.5"><span>mm</span></div></div>
+          <div class="row"><label for="dMesh">Element size</label><div class="inp"><input id="dMesh" type="number" step="any" value="2"><span>mm</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="geo hgeo" style="margin-top:16px">
+      <div class="frame"><div class="ptitle"><strong>3D view of the mesh</strong></div><canvas id="cvDraw3d" aria-label="3D view of the drawn cell"></canvas></div>
+      <div class="frame side"><h3>Model</h3><table class="kv" id="dInfo"></table></div>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="p-disp" role="tabpanel" aria-labelledby="t-disp">
+    <h2 id="dispTitle">Dispersion</h2>
+    <p class="lede" id="dispLede">Left: real Bloch bands along the zone boundary path, coloured by how much kinetic energy sits in the resonators. Right: the complex band along the first path leg, phase change per cell and attenuation per cell against the same frequency axis. Hover to read a frequency; click a band point to animate its mode.</p>
+    <div id="dispParam">
+    <div class="polbar"><span>Wave polarisation</span>
+      <div class="seg" role="radiogroup" aria-label="Wave polarisation">
+        <button type="button" role="radio" aria-checked="true" data-view="oop">Out-of-plane (flexural)</button>
+        <button type="button" role="radio" aria-checked="false" data-view="ip">In-plane</button>
+        <button type="button" role="radio" aria-checked="false" data-view="both">Both: full band gap</button>
+      </div></div>
+    <div class="assess" id="assess1"></div>
+    <div class="disp">
+      <div class="frame"><div class="ptitle"><strong>Band structure</strong><span class="zoombar" data-zg="main" title="Zoom the frequency axis of the band structure and complex band. You can also scroll on either plot, drag to pan, and double-click to reset."><span class="zl">Zoom</span><button type="button" class="zb" data-z="in" aria-label="Zoom in">+</button><button type="button" class="zb" data-z="out" aria-label="Zoom out">−</button><button type="button" class="zb" data-z="reset">Reset</button></span><span id="bandSub"></span></div><canvas id="cvBand" aria-label="Band structure"></canvas></div>
+      <div class="frame"><div class="ptitle"><strong id="cplxTitle">Complex band</strong><span id="cplxSub"></span></div><canvas id="cvCplx" aria-label="Complex band structure"></canvas></div>
+    </div>
+    <div class="legend" id="dispLegend">
+      <span>Host<span class="ramp"></span>Resonator energy share</span>
+      <span><span class="hatch"></span>Complete band gap (all directions on path)</span>
+      <span><span class="sw" style="background:var(--host)"></span>Propagating wave</span>
+      <span><span class="sw" style="background:var(--evan)"></span>Evanescent wave</span>
+      <span><span class="acband"></span>Acoustic branch: starts at 0 Hz at Γ; the whole cell moves together</span><span><span class="opband"></span>Optical branches: start above 0 Hz; parts of the cell move against each other</span><label class="chkline"><input type="checkbox" class="branchchk" checked> Label branches and gaps</label><span class="zhint">Scroll on a plot to zoom in on a narrow gap; drag to move; double-click to reset.</span>
+    </div>
+    <p class="readout" id="readout">Hover over either plot to read frequency, phase and attenuation.</p>
+    <div class="lower">
+      <div class="frame mode">
+        <div class="ptitle"><strong>Mode shape</strong><span id="modeSub">Click a point on the band structure</span></div>
+        <canvas id="cvMode" aria-label="Animated mode shape"></canvas>
+        <div class="ctrl"><button class="mini" id="play" type="button">Pause</button><label>Amplitude <input type="range" id="amp" min="0.2" max="2" step="0.05" value="1"></label><label>Cells <select class="tilesel"><option value="1">1 × 1</option><option value="2">2 × 2</option><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="6">6 × 6</option><option value="9">9 × 9</option><option value="custom">M × N …</option></select></label><span class="tilecustom inp2 hidden"><input type="number" min="1" max="15" step="1" aria-label="Cells along a1"><span>×</span><input type="number" min="1" max="15" step="1" aria-label="Cells along a2"></span><label class="chkline"><input type="checkbox" class="arrowchk" checked> Motion arrows</label></div>
+      </div>
+      <div class="frame gaplist"><div class="ptitle"><strong>Band gaps found</strong><span id="gapSub"></span></div><div id="gaps"><p class="empty">Run the analysis to list band gaps.</p></div></div>
+    </div>
+    </div>
+    <div id="dispDrawn" class="hidden">
+    <div class="assess" id="dAssess"><h3>What this geometry gives</h3><p>Run the analysis to get an assessment.</p></div>
+    <div class="polbar"><span>Wave polarisation</span><div class="seg" role="radiogroup" aria-label="Waves shown">
+      <button type="button" role="radio" data-dshow="flex" aria-checked="true">Out-of-plane (flexural)</button><button type="button" role="radio" data-dshow="ip" aria-checked="false">In-plane</button><button type="button" role="radio" data-dshow="all" aria-checked="false">All: complete gaps</button></div></div>
+    <div class="disp">
+      <div class="frame"><div class="ptitle"><strong>Band structure</strong><span class="zoombar" data-zg="drawn" title="Zoom the frequency axis of the band structure and complex band. You can also scroll on either plot, drag to pan, and double-click to reset."><span class="zl">Zoom</span><button type="button" class="zb" data-z="in" aria-label="Zoom in">+</button><button type="button" class="zb" data-z="out" aria-label="Zoom out">−</button><button type="button" class="zb" data-z="reset">Reset</button></span><span id="dBandSub"></span></div><canvas id="cvDrawBand" aria-label="Band structure of the drawn cell"></canvas></div>
+      <div class="frame"><div class="ptitle"><strong>Complex band</strong><span>μ = k·a₁, phase along a₂ held at 0</span></div><canvas id="cvDrawCplx" aria-label="Complex band of the drawn cell"></canvas></div>
+    </div>
+    <div class="legend"><span>Host<span class="ramp"></span>Resonator energy share</span><span><span class="hatch"></span>Complete band gap of the shown waves</span><span><span class="sw" style="background:var(--host)"></span>Complex band (propagating at Im μ = 0)</span><span><span class="acband"></span>Acoustic branch: starts at 0 Hz at Γ; the whole cell moves together</span><span><span class="opband"></span>Optical branches: start above 0 Hz; parts of the cell move against each other</span><label class="chkline"><input type="checkbox" class="branchchk" checked> Label branches and gaps</label><span class="zhint">Scroll on a plot to zoom in on a narrow gap; drag to move; double-click to reset.</span></div>
+    <div class="lower">
+      <div class="frame mode"><div class="ptitle"><strong>Mode shape</strong><span id="dModeSub">Click a point on the band structure</span></div><canvas id="cvDrawMode" aria-label="Animated mode shape of the drawn cell"></canvas><div class="ctrl"><label>Amplitude <input type="range" id="dAmp" min="0.2" max="2" step="0.05" value="1"></label><label>Cells <select class="tilesel"><option value="1">1 × 1</option><option value="2">2 × 2</option><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="6">6 × 6</option><option value="9">9 × 9</option><option value="custom">M × N …</option></select></label><span class="tilecustom inp2 hidden"><input type="number" min="1" max="15" step="1" aria-label="Cells along a1"><span>×</span><input type="number" min="1" max="15" step="1" aria-label="Cells along a2"></span><label class="chkline"><input type="checkbox" class="arrowchk" checked> Motion arrows</label></div></div>
+      <div class="frame gaplist"><div class="ptitle"><strong>Band gaps found</strong></div><div id="dGaps"><p class="empty">Run the analysis to list band gaps.</p></div></div>
+    </div>
+    </div>
+  </section>
+
+  <section class="panel hidden sweep" id="p-sens" role="tabpanel" aria-labelledby="t-sens">
+    <h2>Mass and stiffness sensitivity</h2>
+    <p class="lede">Scales one quantity at a time around the current design and recomputes the complete gaps. The table gives log-sensitivities S = ∂ ln f / ∂ ln p at the nominal design: S = −0.5 means a 10 % increase in the parameter lowers that gap edge by about 5 %.</p>
+    <div class="sweepbar">
+      <div><label for="sFam">Wave polarisation</label><select id="sFam"><option value="oop">Out-of-plane</option><option value="ip">In-plane</option><option value="all" data-drawn>All waves (complete gaps)</option></select></div>
+      <div><label for="sp">Parameter to vary</label>
+        <select id="sp">
+          <option value="resM">Resonator mass</option>
+          <option value="resK">Resonator stiffness (k or arm E)</option>
+          <option value="hostRho">Host beam mass (density)</option>
+          <option value="hostE">Host beam stiffness (E)</option>
+          <option value="a">Cell size (all in-plane lengths)</option>
+          <option value="part" data-drawn>One part: a size or thickness</option>
+        </select></div>
+      <div id="spPartBox" class="hidden"><label for="spPart">Part and dimension</label><select id="spPart"></select></div>
+      <div><label for="sr">Range (× and ÷)</label><input id="sr" type="number" step="any" value="4" style="width:80px"></div>
+      <div><label for="sn">Samples</label><input id="sn" type="number" step="2" value="13" style="width:80px"></div>
+      <button class="run" id="sweep" type="button">Run sweep</button>
+    </div>
+    <div class="frame"><canvas id="cvSweep" aria-label="Gap map against parameter"></canvas></div>
+    <div class="frame gaplist" style="margin-top:14px"><div id="sensTable"><p class="empty">Run a sweep to see the gap map and sensitivities.</p></div></div>
+  </section>
+
+  <section class="panel hidden" id="p-edge" role="tabpanel" aria-labelledby="t-edge">
+    <h2>Edge waves</h2>
+    <p class="lede" id="edgeLede">A strip N cells wide, repeating along the edge and free on both long sides, is solved for its own bands. Grey areas are the bulk bands projected onto the edge direction. A strip mode outside them that keeps most of its energy in the outer cells is an edge wave; one inside a complete gap is an edge wave the bulk cannot carry.</p>
+    <div class="assess" id="assess2"></div>
+    <div class="sweepbar">
+      <div><label for="eKind">Model</label><select id="eKind"><option value="strip">Strip: periodic along one edge</option><option value="finite">Finite sample M × N, all edges free</option></select></div>
+      <div data-ek="finite"><label for="eShape">Sample shape</label><select id="eShape"><option value="rect">Rectangle (staggered columns)</option><option value="para">Parallelogram M × N</option></select></div>
+      <div data-ek="finite"><label for="eM">Cells along a₁ (M)</label><input id="eM" type="number" step="1" value="4" style="width:70px"></div>
+      <div data-ek="finite"><label for="eNn">Columns / cells along a₂ (N)</label><input id="eNn" type="number" step="1" value="4" style="width:70px"></div>
+      <div data-ek="finite"><label for="eFc">Centre frequency (0 = gap centre)</label><input id="eFc" type="number" step="any" value="0" style="width:110px"></div>
+      <div data-ek="finite"><label for="eNm">Modes to find</label><input id="eNm" type="number" step="1" value="60" style="width:70px"></div>
+      <div data-ek="finite"><label for="eDrive">Shaker</label><select id="eDrive"><option value="none">None (modes only)</option><option value="bottom" selected>Middle of the bottom edge</option><option value="left">Middle of the left edge</option><option value="centre">Centre</option><option value="corner">Bottom-left corner</option></select></div>
+      <div data-ek="finite"><label for="eView">Show</label><select id="eView"><option value="driven">Driven response</option><option value="modes">Modes</option></select></div>
+      <div data-ek="strip"><label for="eN">Cells across the strip</label><input id="eN" type="number" step="1" value="8" style="width:80px"></div>
+      <div><label for="eFam">Wave polarisation</label><select id="eFam"><option value="oop">Out-of-plane</option><option value="ip">In-plane</option><option value="all" data-drawn>All waves</option></select></div>
+      <div data-ek="strip"><label for="eDir">Edge runs along</label><select id="eDir"><option value="a1">a₁ (horizontal)</option><option value="a2">a₂ (60°)</option></select></div>
+      <div data-ek="strip"><label for="eW">Edge zone (cells)</label><input id="eW" type="number" step="any" value="2" style="width:80px"></div>
+      <div data-ek="strip"><label for="eK">k-points</label><input id="eK" type="number" step="1" value="17" style="width:80px"></div>
+      <button class="run" id="edgeRun" type="button">Run edge analysis</button>
+      <button class="mini" id="eZak" type="button" title="Zak phase of the bands below each gap, along three lattice directions">Topology check (Zak phase)</button>
+    </div>
+    <div class="lower" style="margin-top:0">
+      <div class="frame"><div class="ptitle"><strong id="edgeT1">Strip bands</strong><span id="edgeSub"></span></div><canvas id="cvEdge" aria-label="Strip band structure"></canvas></div>
+      <div class="frame mode"><div class="ptitle"><strong id="edgeT2">Strip mode shape</strong><span id="edgeModeSub">Click a point on the strip bands</span></div><canvas id="cvEdgeMode" aria-label="Strip mode shape"></canvas></div>
+    </div>
+    <div class="legend" id="edgeLegend">
+      <span><span class="sw" style="background:var(--grid);border-radius:2px;border:1px solid var(--rule)"></span>Bulk bands projected on the edge</span>
+      <span><span class="sw" style="background:var(--evan)"></span>Bulk-like strip mode</span>
+      <span><span class="sw" style="background:var(--edge)"></span>Edge-localised mode</span>
+      <span><span class="sw" style="background:var(--edge);box-shadow:0 0 0 2px var(--ink)"></span>Edge wave inside a bulk gap</span>
+      <span><span class="hatch"></span>Complete bulk band gap</span>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="p-meth" role="tabpanel" aria-labelledby="t-meth">
+    <div class="method" id="methodText"></div>
+  </section>
+</main>
+</div>
+<script src="src/engine.js"></script>
+<script src="src/homog.js"></script>
+<script src="src/aids.js"></script>
+<script src="src/app.js"></script>
+<script src="src/viz.js"></script>
+<script src="src/draw.js"></script>
+<script src="src/drawapp.js"></script>
+</body></html>

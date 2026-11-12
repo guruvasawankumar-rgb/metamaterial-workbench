@@ -1,0 +1,30 @@
+{
+  "_comment": "Your sample: 14 mm regular hexagon, 1 x 5 mm walls, one 2 x 1 mm arm on wall 1 carrying a 6 x 6 x 5 mm block. Units: mm, g, GPa, kg/m3, Hz.",
+  "lattice": "hexagon",
+  "hexagon": { "l_mm": 8.0829, "h_mm": 8.0829, "theta_deg": 30 },
+  "lattice_constant_mm": 14,
+  "walls": { "shape": "rect", "width_mm": 1, "height_mm": 5, "vertical_wall_width_factor": 1 },
+  "material": { "E_GPa": 68.9, "nu": 0.33, "rho_kg_m3": 2700 },
+  "resonator": {
+    "type": "arm",
+    "attach": "mid",
+    "walls": [1],
+    "orient": "in",
+    "shape": "straight",
+    "arm_length_mm": 6.5,
+    "arm_width_mm": 2,
+    "arm_thickness_mm": 1,
+    "tip": "block",
+    "block_length_mm": 6, "block_width_mm": 6, "block_height_mm": 5,
+    "block_position": "centred"
+  },
+  "solver": {
+    "beam": "tim",
+    "elements_per_wall": 4,
+    "path": "std",
+    "kpoints_per_segment": 16,
+    "bands": 12,
+    "fmax_Hz": { "oop": 12000, "ip": 24000 },
+    "complex_band_samples": 300
+  }
+}

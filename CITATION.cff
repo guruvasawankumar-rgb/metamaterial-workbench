@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Metamaterial Workbench"
+abstract: "Browser-based finite-element workbench for locally resonant metamaterials: Bloch band structures, band gaps, complex bands, sensitivity, edge waves (strip, finite and driven samples) and Zak-phase topology checks, for beam, shell and plate unit cells."
+type: software
+authors:
+  - family-names: "Guruva"
+    given-names: "Sawan Kumar"
+    affiliation: "Sapienza University of Rome"
+    orcid: "https://orcid.org/0000-0002-0225-6355"
+version: 1.1.0
+date-released: "2026-11-11"
+license: MIT
+repository-code: "https://github.com/guruvasawankumar-rgb/metamaterial-workbench"
+url: "https://guruvasawankumar-rgb.github.io/metamaterial-workbench/"
+keywords:
+  - metamaterials
+  - phononic crystals
+  - band gap
+  - local resonance
+  - finite element method
+  - Bloch waves
+  - edge waves
+  - Zak phase
